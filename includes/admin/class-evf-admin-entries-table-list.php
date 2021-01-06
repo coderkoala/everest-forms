@@ -55,7 +55,7 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 		// Check that the user has created at least one form.
 		if ( ! empty( $this->forms ) ) {
 			$this->form_id   = ! empty( $_REQUEST['form_id'] ) ? absint( $_REQUEST['form_id'] ) : apply_filters( 'everest_forms_entry_list_default_form_id', key( $this->forms ) ); // phpcs:ignore WordPress.Security.NonceVerification
-			$this->form      = EVF()->form->get( $this->form_id );
+			$this->form      = evf()->form->get( $this->form_id );
 			$this->form_data = ! empty( $this->form->post_content ) ? evf_decode( $this->form->post_content ) : '';
 		}
 
@@ -132,6 +132,23 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 	}
 
 	/**
+	 * Generates content for a single row of the table.
+	 *
+	 * @since 1.6.0
+	 *
+	 * @param object $entry Entry data.
+	 */
+	public function single_row( $entry ) {
+		if ( empty( $_GET['status'] ) || ( isset( $_GET['status'] ) && 'trash' !== $_GET['status'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			echo '<tr class="' . ( $entry->viewed ? 'read' : 'unread' ) . '">';
+			$this->single_row_columns( $entry );
+			echo '</tr>';
+		} else {
+			parent::single_row( $entry );
+		}
+	}
+
+	/**
 	 * Get the list of fields, that are disallowed to be displayed as column in a table.
 	 *
 	 * @return array
@@ -149,7 +166,7 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 	 * @return array
 	 */
 	public function get_columns_form_fields( $columns = array(), $display = 3 ) {
-		$entry_columns = EVF()->form->get_meta( $this->form_id, 'entry_columns' );
+		$entry_columns = evf()->form->get_meta( $this->form_id, 'entry_columns' );
 
 		if ( ! $entry_columns && ! empty( $this->form_data['form_fields'] ) ) {
 			$x = 0;
@@ -205,29 +222,35 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 			if ( is_serialized( $value ) ) {
 				$field_html  = array();
 				$field_value = maybe_unserialize( $value );
+				$field_label = ! empty( $field_value['label'] ) ? evf_clean( $field_value['label'] ) : $field_value;
 
-				if ( ! empty( $field_value ) ) {
-					foreach ( $field_value as $field => $meta_val ) {
-						$field_html[] = $meta_val;
+				if ( is_array( $field_label ) ) {
+					foreach ( $field_label as $value ) {
+						$field_html[] = esc_html( $value );
 					}
-				}
 
-				$value = implode( ' | ', $field_html );
+					$value = implode( ' | ', $field_html );
+				} else {
+					$value = esc_html( $field_label );
+				}
 			}
 
 			// Limit to 5 lines.
-			$lines = explode( "\n", $value );
-			$value = array_slice( $lines, 0, 4 );
-			$value = implode( "\n", $value );
+			if ( false === strpos( $value, 'http' ) ) {
+				$lines = explode( "\n", $value );
+				$value = array_slice( $lines, 0, 4 );
+				$value = implode( "\n", $value );
 
-			if ( count( $lines ) > 5 ) {
-				$value .= '&hellip;';
-			} elseif ( strlen( $value ) > 75 ) {
-				$value = substr( $value, 0, 75 ) . '&hellip;';
+				if ( count( $lines ) > 5 ) {
+					$value .= '&hellip;';
+				} elseif ( strlen( $value ) > 75 ) {
+					$value = substr( $value, 0, 75 ) . '&hellip;';
+				}
+
+				$value = nl2br( wp_strip_all_tags( trim( $value ) ) );
 			}
-			$value = nl2br( wp_strip_all_tags( trim( $value ) ) );
 
-			return apply_filters( 'everest_forms_html_field_value', $value, $entry->meta[ $meta_key ], $this->form_data, 'entry-table' );
+			return apply_filters( 'everest_forms_html_field_value', $value, $entry->meta[ $meta_key ], $entry, 'entry-table' );
 		} else {
 			return '<span class="na">&mdash;</span>';
 		}
@@ -326,19 +349,19 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 	 * @return array
 	 */
 	private function get_status_label( $status_name, $amount ) {
-		$statuses = evf_get_entry_statuses();
+		$statuses = evf_get_entry_statuses( $this->form_data );
 
 		if ( isset( $statuses[ $status_name ] ) ) {
 			return array(
-				'singular' => sprintf( '%s <span class="count">(%s)</span>', esc_html( $statuses[ $status_name ] ), $amount ),
-				'plural'   => sprintf( '%s <span class="count">(%s)</span>', esc_html( $statuses[ $status_name ] ), $amount ),
+				'singular' => sprintf( '%s <span class="count">(<span class="%s-count">%s</span>)</span>', esc_html( $statuses[ $status_name ] ), $status_name, $amount ),
+				'plural'   => sprintf( '%s <span class="count">(<span class="%s-count">%s</span>)</span>', esc_html( $statuses[ $status_name ] ), $status_name, $amount ),
 				'context'  => '',
 				'domain'   => 'everest-forms',
 			);
 		}
 
 		return array(
-			'singular' => sprintf( '%s <span class="count">(%s)</span>', esc_html( $status_name ), $amount ),
+			'singular' => sprintf( '%s <span class="count">(<span class="%s-count">%s</span>)</span>', esc_html( $statuses[ $status_name ] ), $status_name, $amount ),
 			'plural'   => sprintf( '%s <span class="count">(%s)</span>', esc_html( $status_name ), $amount ),
 			'context'  => '',
 			'domain'   => 'everest-forms',
@@ -353,9 +376,9 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 	protected function get_views() {
 		$status_links  = array();
 		$num_entries   = evf_get_count_entries_by_status( $this->form_id );
-		$total_entries = array_sum( (array) $num_entries ) - $num_entries['trash'];
-		$statuses      = array_keys( evf_get_entry_statuses() );
-		$class         = empty( $_REQUEST['status'] ) ? ' class="current"' : ''; // WPCS: input var okay. CSRF ok.
+		$total_entries = apply_filters( 'everest_forms_total_entries_count', (int) $num_entries['publish'], $num_entries, $this->form_id );
+		$statuses      = array_keys( evf_get_entry_statuses( $this->form_data ) );
+		$class         = empty( $_REQUEST['status'] ) ? ' class="current"' : ''; // phpcs:ignore WordPress.Security.NonceVerification
 
 		/* translators: %s: count */
 		$status_links['all'] = "<a href='admin.php?page=evf-entries&amp;form_id=$this->form_id'$class>" . sprintf( _nx( 'All <span class="count">(%s)</span>', 'All <span class="count">(%s)</span>', $total_entries, 'entries', 'everest-forms' ), number_format_i18n( $total_entries ) ) . '</a>';
@@ -363,11 +386,11 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 		foreach ( $statuses as $status_name ) {
 			$class = '';
 
-			if ( empty( $num_entries[ $status_name ] ) || 'publish' === $status_name ) {
+			if ( 'publish' === $status_name ) {
 				continue;
 			}
 
-			if ( isset( $_REQUEST['status'] ) && sanitize_key( wp_unslash( $_REQUEST['status'] ) ) === $status_name ) { // WPCS: input var okay, CSRF ok.
+			if ( isset( $_REQUEST['status'] ) && sanitize_key( wp_unslash( $_REQUEST['status'] ) ) === $status_name ) { // phpcs:ignore WordPress.Security.NonceVerification
 				$class = ' class="current"';
 			}
 
@@ -376,7 +399,7 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 			$status_links[ $status_name ] = "<a href='admin.php?page=evf-entries&amp;form_id=$this->form_id&amp;status=$status_name'$class>" . sprintf( translate_nooped_plural( $label, $num_entries[ $status_name ] ), number_format_i18n( $num_entries[ $status_name ] ) ) . '</a>';
 		}
 
-		return $status_links;
+		return apply_filters( 'everest_forms_entries_table_views', $status_links, $num_entries, $this->form_data );
 	}
 
 	/**
@@ -386,15 +409,17 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 	 */
 	protected function get_bulk_actions() {
 		if ( isset( $_GET['status'] ) && 'trash' === $_GET['status'] ) { // phpcs:ignore WordPress.Security.NonceVerification
-			return array(
+			$actions = array(
 				'untrash' => __( 'Restore', 'everest-forms' ),
 				'delete'  => __( 'Delete Permanently', 'everest-forms' ),
 			);
+		} else {
+			$actions = array(
+				'trash' => __( 'Move to Trash', 'everest-forms' ),
+			);
 		}
 
-		return array(
-			'trash' => __( 'Move to Trash', 'everest-forms' ),
-		);
+		return apply_filters( 'everest_forms_entry_bulk_actions', $actions );
 	}
 
 	/**
@@ -405,7 +430,7 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 	public function process_bulk_action() {
 		$pagenum   = $this->get_pagenum();
 		$doaction  = $this->current_action();
-		$entry_ids = isset( $_REQUEST['entry'] ) ? wp_parse_id_list( wp_unslash( $_REQUEST['entry'] ) ) : array(); // WPCS: input var ok, CSRF ok.
+		$entry_ids = isset( $_REQUEST['entry'] ) ? wp_parse_id_list( wp_unslash( $_REQUEST['entry'] ) ) : array(); // phpcs:ignore WordPress.Security.NonceVerification
 		$count     = 0;
 
 		if ( $doaction ) {
@@ -423,6 +448,38 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 			}
 
 			switch ( $doaction ) {
+				case 'star':
+				case 'unstar':
+					foreach ( $entry_ids as $entry_id ) {
+						if ( EVF_Admin_Entries::update_status( $entry_id, $doaction ) ) {
+							$count ++;
+						}
+					}
+
+					add_settings_error(
+						'bulk_action',
+						'bulk_action',
+						/* translators: %d: number of entries, %s: entries status */
+						sprintf( _n( '%1$d entry successfully %2$s.', '%1$d entries successfully %2$s.', $count, 'everest-forms' ), $count, 'star' === $doaction ? 'starred' : 'unstarred' ),
+						'updated'
+					);
+					break;
+				case 'read':
+				case 'unread':
+					foreach ( $entry_ids as $entry_id ) {
+						if ( EVF_Admin_Entries::update_status( $entry_id, $doaction ) ) {
+							$count ++;
+						}
+					}
+
+					add_settings_error(
+						'bulk_action',
+						'bulk_action',
+						/* translators: %d: number of entries, %s: entries status */
+						sprintf( _n( '%1$d entry successfully marked as %2$s.', '%1$d entries successfully marked as %2$s.', $count, 'everest-forms' ), $count, $doaction ),
+						'updated'
+					);
+					break;
 				case 'trash':
 					foreach ( $entry_ids as $entry_id ) {
 						if ( EVF_Admin_Entries::update_status( $entry_id, 'trash' ) ) {
@@ -473,8 +530,8 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 
 			wp_safe_redirect( $sendback );
 			exit();
-		} elseif ( ! empty( $_REQUEST['_wp_http_referer'] ) && isset( $_SERVER['REQUEST_URI'] ) ) { // WPCS: input var ok, CSRF ok.
-			wp_safe_redirect( remove_query_arg( array( '_wp_http_referer', '_wpnonce' ), wp_unslash( $_SERVER['REQUEST_URI'] ) ) ); // WPCS: input var ok, sanitization ok.
+		} elseif ( ! empty( $_REQUEST['_wp_http_referer'] ) && isset( $_SERVER['REQUEST_URI'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			wp_safe_redirect( remove_query_arg( array( '_wp_http_referer', '_wpnonce' ), wp_unslash( $_SERVER['REQUEST_URI'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			exit();
 		}
 	}
@@ -546,21 +603,21 @@ class EVF_Admin_Entries_Table_List extends WP_List_Table {
 		);
 
 		// Handle the status query.
-		if ( ! empty( $_REQUEST['status'] ) ) { // WPCS: input var okay, CSRF ok.
-			$args['status'] = sanitize_key( wp_unslash( $_REQUEST['status'] ) ); // WPCS: input var okay, CSRF ok.
+		if ( ! empty( $_REQUEST['status'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$args['status'] = sanitize_key( wp_unslash( $_REQUEST['status'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 		}
 
 		// Handle the search query.
-		if ( ! empty( $_REQUEST['s'] ) ) { // WPCS: input var okay, CSRF ok.
-			$args['search'] = sanitize_text_field( wp_unslash( $_REQUEST['s'] ) ); // WPCS: input var okay, CSRF ok.
+		if ( ! empty( $_REQUEST['s'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$args['search'] = sanitize_text_field( wp_unslash( $_REQUEST['s'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 		}
 
-		if ( ! empty( $_REQUEST['orderby'] ) ) { // WPCS: input var okay, CSRF ok.
-			$args['orderby'] = sanitize_text_field( wp_unslash( $_REQUEST['orderby'] ) ); // WPCS: input var okay, CSRF ok.
+		if ( ! empty( $_REQUEST['orderby'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$args['orderby'] = sanitize_text_field( wp_unslash( $_REQUEST['orderby'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 		}
 
-		if ( ! empty( $_REQUEST['order'] ) ) { // WPCS: input var okay, CSRF ok.
-			$args['order'] = sanitize_text_field( wp_unslash( $_REQUEST['order'] ) ); // WPCS: input var okay, CSRF ok.
+		if ( ! empty( $_REQUEST['order'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$args['order'] = sanitize_text_field( wp_unslash( $_REQUEST['order'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 		}
 
 		// Get the entries.

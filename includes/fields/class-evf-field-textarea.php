@@ -29,6 +29,7 @@ class EVF_Field_Textarea extends EVF_Form_Fields {
 					'meta',
 					'description',
 					'required',
+					'required_field_message',
 				),
 			),
 			'advanced-options' => array(
@@ -123,14 +124,16 @@ class EVF_Field_Textarea extends EVF_Form_Fields {
 	 */
 	public function load_assets( $atts ) {
 		$form_id   = isset( $atts['id'] ) ? wp_unslash( $atts['id'] ) : ''; // WPCS: CSRF ok, input var ok, sanitization ok.
-		$form_obj  = EVF()->form->get( $form_id );
+		$form_obj  = evf()->form->get( $form_id );
 		$form_data = ! empty( $form_obj->post_content ) ? evf_decode( $form_obj->post_content ) : '';
 
 		// Leave only fields with limit.
-		$form_fields = array_filter( $form_data['form_fields'], array( $this, 'field_is_limit' ) );
+		if ( ! empty( $form_data['form_fields'] ) ) {
+			$form_fields = array_filter( $form_data['form_fields'], array( $this, 'field_is_limit' ) );
 
-		if ( count( $form_fields ) ) {
-			wp_enqueue_script( 'everest-forms-text-limit' );
+			if ( count( $form_fields ) ) {
+				wp_enqueue_script( 'everest-forms-text-limit' );
+			}
 		}
 	}
 
@@ -157,22 +160,20 @@ class EVF_Field_Textarea extends EVF_Form_Fields {
 	/**
 	 * Field display on the form front-end.
 	 *
-	 * @since      1.0.0
+	 * @since 1.0.0
 	 *
-	 * @param array $field      Field data and settings.
-	 * @param array $deprecated Deprecated.
-	 * @param array $form_data  Form data and settings.
+	 * @param array $field Field Data.
+	 * @param array $field_atts Field attributes.
+	 * @param array $form_data All Form Data.
 	 */
-	public function field_display( $field, $deprecated, $form_data ) {
+	public function field_display( $field, $field_atts, $form_data ) {
 		// Define data.
 		$value   = '';
 		$primary = $field['properties']['inputs']['primary'];
 
-		if ( ! empty( $primary['attr']['value'] ) ) {
-			$value = $primary['attr']['value'];
+		if ( isset( $primary['attr']['value'] ) ) {
+			$value = evf_sanitize_textarea_field( $primary['attr']['value'] );
 			unset( $primary['attr']['value'] );
-
-			$value = evf_sanitize_textarea_field( $value );
 		}
 
 		// Limit length.
@@ -199,6 +200,6 @@ class EVF_Field_Textarea extends EVF_Form_Fields {
 			evf_html_attributes( $primary['id'], $primary['class'], $primary['data'], $primary['attr'] ),
 			esc_attr( $primary['required'] ),
 			$value // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		);
+		); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 }

@@ -2,14 +2,14 @@
 ( function( $, params ) {
 
 	// Colorpicker.
-	$( '.colorpicker' ).wpColorPicker();
+	$( '.evf-colorpicker' ).wpColorPicker();
 
 	// Enable Perfect Scrollbar.
 	$( document ).on( 'init_perfect_scrollbar', function() {
 		var nav_wrapper = $( 'nav.evf-nav-tab-wrapper' );
 
 		if ( nav_wrapper.length >= 1 ) {
-			window.evf_nav_ps = new PerfectScrollbar( nav_wrapper.selector, {
+			window.evf_nav_ps = new PerfectScrollbar( 'nav.evf-nav-tab-wrapper', {
 				suppressScrollY : true,
 				useBothWheelAxes: true,
 				wheelPropagation: true
@@ -100,7 +100,7 @@
 		})
 
 		.on( 'keyup focus', '.evf-input-number[type=number]', function() {
-			var fieldId  = $( this ).parent().data( 'fieldId' );
+			var fieldId  = $( this ).parent().data( 'fieldId' ) ? $( this ).parent().data( 'fieldId' ) : $( this ).closest( '.everest-forms-field-option-row' ).data( 'field-id' );
 			var maxField = $( "input#everest-forms-field-option-"+fieldId+"-max_value" );
 			var minField = $( "input#everest-forms-field-option-"+fieldId+"-min_value" );
 			var maxVal   = maxField.val();
@@ -121,7 +121,7 @@
 		})
 
 		.on( 'init_tooltips', function() {
-			$( '.tips, .help_tip, .everest-forms-help-tip, .everest-forms-help-tooltip' ).tooltipster( {
+			$( '.tips, .help_tip, .everest-forms-help-tip, .everest-forms-help-tooltip, .everest-forms-icon' ).tooltipster( {
 				maxWidth: 200,
 				multiple: true,
 				interactive: true,
@@ -277,4 +277,11 @@
 			}
 		});
 	});
+
+	// Adding active class for button group
+	$('.everest-forms-btn-group .everest-forms-btn').on('click', function() {
+		$(this).siblings().removeClass('is-active')
+		$(this).addClass('is-active');
+	})
+
 })( jQuery, everest_forms_admin );

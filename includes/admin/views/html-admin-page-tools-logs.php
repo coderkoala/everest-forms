@@ -13,8 +13,8 @@ defined( 'ABSPATH' ) || exit;
 		<div class="alignleft">
 			<h2>
 				<?php echo esc_html( $viewed_log ); ?>
-				<?php if ( ! empty( $handle ) ) : ?>
-					<a class="page-title-action" href="<?php echo esc_url( wp_nonce_url( add_query_arg( array( 'handle' => $handle ), admin_url( 'admin.php?page=evf-tools&tab=logs' ) ), 'remove_log' ) ); ?>" class="button"><?php esc_html_e( 'Delete log', 'everest-forms' ); ?></a>
+				<?php if ( ! empty( $viewed_log ) ) : ?>
+					<a class="page-title-action" href="<?php echo esc_url( wp_nonce_url( add_query_arg( array( 'handle' => sanitize_title( $viewed_log ) ), admin_url( 'admin.php?page=evf-tools&tab=logs' ) ), 'remove_log' ) ); ?>" class="button"><?php esc_html_e( 'Delete log', 'everest-forms' ); ?></a>
 				<?php endif; ?>
 			</h2>
 		</div>
@@ -36,8 +36,8 @@ defined( 'ABSPATH' ) || exit;
 		<div class="clear"></div>
 	</div>
 	<div id="log-viewer">
-		<pre><?php echo esc_html( file_get_contents( EVF_LOG_DIR . $viewed_log ) ); ?></pre>
+		<pre><?php echo esc_html( file_get_contents( EVF_LOG_DIR . $viewed_log ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents ?></pre>
 	</div>
 <?php else : ?>
-	<div class="updated everest-forms-message inline"><p><?php _e( 'There are currently no logs to view.', 'everest-forms' ); ?></p></div>
+	<div class="updated everest-forms-message inline"><p><?php esc_html_e( 'There are currently no logs to view.', 'everest-forms' ); ?></p></div>
 <?php endif; ?>

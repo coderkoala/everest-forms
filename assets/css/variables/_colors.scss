@@ -3,6 +3,7 @@
  */
 /*=====  Primary Color  ======*/
 $everestforms:					#7e3bd0;
+$everestforms-soft:				lighten($everestforms, 40%);
 
 /*=====  Semantic Color  ======*/
 // Colors for notifications
@@ -24,10 +25,20 @@ $color_gray-light-skin:			#f6f7f9;
 // White color
 $color-white:					#fff;
 
+
+$body-text:						$color_gray-base;
+$muted-text: 					$color_gray-light;
+
+// Border variables
+$border-width:					1px;
+$border-color: 					$color_gray-lighten;
+
+// Input variables
+$input-border-color:            $border-color;
+$input-border-focus-color:      $everestforms;
+
 /**
  * Font Size Variables
  */
-
 $font_size-base: 14px;
-
 $font_size-label: $font_size-base;

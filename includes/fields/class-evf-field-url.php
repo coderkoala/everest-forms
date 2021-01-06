@@ -29,6 +29,7 @@ class EVF_Field_URL extends EVF_Form_Fields {
 					'meta',
 					'description',
 					'required',
+					'required_field_message',
 				),
 			),
 			'advanced-options' => array(
@@ -46,12 +47,11 @@ class EVF_Field_URL extends EVF_Form_Fields {
 	/**
 	 * Field preview inside the builder.
 	 *
-	 * @since      1.0.0
+	 * @since 1.0.0
 	 *
-	 * @param array $field
+	 * @param array $field Field data and settings.
 	 */
 	public function field_preview( $field ) {
-
 		// Define data.
 		$placeholder = ! empty( $field['placeholder'] ) ? esc_attr( $field['placeholder'] ) : '';
 
@@ -59,7 +59,7 @@ class EVF_Field_URL extends EVF_Form_Fields {
 		$this->field_preview_option( 'label', $field );
 
 		// Primary input.
-		echo '<input type="url" placeholder="' . $placeholder . '" class="widefat" disabled>';
+		echo '<input type="url" placeholder="' . esc_attr( $placeholder ) . '" class="widefat" disabled>';
 
 		// Description.
 		$this->field_preview_option( 'description', $field );
@@ -68,13 +68,13 @@ class EVF_Field_URL extends EVF_Form_Fields {
 	/**
 	 * Field display on the form front-end.
 	 *
-	 * @since      1.0.0
+	 * @since 1.0.0
 	 *
-	 * @param array $field
-	 * @param array $deprecated
-	 * @param array $form_data
+	 * @param array $field Field Data.
+	 * @param array $field_atts Field attributes.
+	 * @param array $form_data All Form Data.
 	 */
-	public function field_display( $field, $deprecated, $form_data ) {
+	public function field_display( $field, $field_atts, $form_data ) {
 		// Define data.
 		$primary = $field['properties']['inputs']['primary'];
 

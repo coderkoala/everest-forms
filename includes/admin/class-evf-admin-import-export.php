@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 class EVF_Admin_Import_Export {
 
 	/**
-	 * Constructor
+	 * Constructor.
 	 */
 	public function __construct() {
 		add_action( 'admin_init', array( $this, 'export_json' ) );
@@ -22,8 +22,6 @@ class EVF_Admin_Import_Export {
 
 	/**
 	 * Exports form data along with settings in JSON format.
-	 *
-	 * @return void
 	 */
 	public function export_json() {
 		// Check for non empty $_POST.
@@ -54,7 +52,13 @@ class EVF_Admin_Import_Export {
 			),
 		);
 		$form_name   = strtolower( str_replace( ' ', '-', get_the_title( $form_id ) ) );
-		$file_name   = $form_name . '-' . current_time( 'Y-m-d_H:i:s' ) . '.json';
+		$file_name   = html_entity_decode( $form_name, ENT_QUOTES, 'UTF-8' ) . '-' . current_time( 'Y-m-d_H:i:s' ) . '.json';
+
+		// Export form styles if found.
+		$form_styles = get_option( 'everest_forms_styles', array() );
+		if ( ! empty( $form_styles[ $form_id ] ) ) {
+			$export_data['form_styles'] = wp_json_encode( $form_styles[ $form_id ] );
+		}
 
 		if ( ob_get_contents() ) {
 			ob_clean();
@@ -64,7 +68,7 @@ class EVF_Admin_Import_Export {
 		// Force download.
 		header( 'Content-Type: application/force-download' );
 		// Disposition / Encoding on response body.
-		header( "Content-Disposition: attachment;filename={$file_name}" );
+		header( "Content-Disposition: attachment;filename={$file_name}; charset=utf-8" );
 		header( 'Content-type: application/json' );
 		echo $export_json; // phpcs:ignore WordPress.Security.EscapeOutput
 		exit();
@@ -75,7 +79,7 @@ class EVF_Admin_Import_Export {
 	 */
 	public static function import_form() {
 		// Check for $_FILES set or not.
-		if ( isset( $_FILES['jsonfile'] ) ) {
+		if ( isset( $_FILES['jsonfile']['name'], $_FILES['jsonfile']['tmp_name'] ) ) {
 			$filename  = esc_html( sanitize_text_field( wp_unslash( $_FILES['jsonfile']['name'] ) ) );
 			$extension = pathinfo( $filename, PATHINFO_EXTENSION );
 
@@ -116,6 +120,19 @@ class EVF_Admin_Import_Export {
 
 						wp_update_post( $form );
 
+						// Import form styles if present.
+						$style_needed = false;
+						if ( ! empty( $form_data->form_styles ) ) {
+							$style_needed            = true;
+							$form_styles             = get_option( 'everest_forms_styles', array() );
+							$form_styles[ $post_id ] = evf_decode( $form_data->form_styles );
+
+							// Update forms styles.
+							update_option( 'everest_forms_styles', $form_styles );
+						}
+
+						do_action( 'everest_forms_import_form', $post_id, $form, array(), $style_needed );
+
 						// Check for any error while inserting.
 						if ( is_wp_error( $post_id ) ) {
 							return $post_id;
@@ -145,7 +162,7 @@ class EVF_Admin_Import_Export {
 			} else {
 				wp_send_json_error(
 					array(
-						'message' => esc_html__( 'Invalid file format. Only Json File Allowed.', 'everest-forms' ),
+						'message' => esc_html__( 'Invalid file format. Only JSON File Allowed.', 'everest-forms' ),
 					)
 				);
 			}
